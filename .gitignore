@@ -1,0 +1,20 @@
+# Build output
+build/
+*.o
+*.d
+*.lst
+*.map
+*.elf
+*.bin
+*.hex
+
+# STM32CubeIDE (if you reopen the project there)
+Debug/
+Release/
+.settings/
+.cproject
+.project
+*.launch
+
+# macOS
+.DS_Store

@@ -1,0 +1,11 @@
+{
+  "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+  "makefile.makefilePath": "Makefile",
+  "files.associations": {
+    "*.ld": "linkerscript",
+    "*.s": "arm"
+  },
+  "cortex-debug.armToolchainPath": "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/bin",
+  "cortex-debug.gdbPath": "/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/bin/arm-none-eabi-gdb",
+  "cortex-debug.JLinkGDBServerPath": "/Applications/SEGGER/JLink/JLinkGDBServerCLExe"
+}

@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug (J-Link)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "jlink",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/pan_tilt.elf",
+      "device": "STM32F411CE",
+      "interface": "swd",
+      "serverpath": "/Applications/SEGGER/JLink/JLinkGDBServerCLExe",
+      "preLaunchTask": "build",
+      "runToEntryPoint": "main",
+      "showDevDebugOutput": "none"
+    },
+    {
+      "name": "Attach (J-Link, no reflash)",
+      "type": "cortex-debug",
+      "request": "attach",
+      "servertype": "jlink",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/build/pan_tilt.elf",
+      "device": "STM32F411CE",
+      "interface": "swd",
+      "serverpath": "/Applications/SEGGER/JLink/JLinkGDBServerCLExe"
+    }
+  ]
+}
