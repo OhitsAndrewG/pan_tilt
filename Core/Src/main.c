@@ -19,9 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "laser.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +48,22 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
+/* Tick value captured at boot -- left over from the blink experiment, not
+   used by anything now. Safe to delete, or keep it for an uptime reading. */
+static uint32_t start_time = 0;
+
+/* Landing zone for the UART receiver. The HAL writes the incoming byte here
+   from inside the interrupt, so main() must only read it while `received`
+   says a complete byte is sitting there. */
+uint8_t rx[1];
+
+/* Raised by the RX interrupt, cleared by the main loop.
+   `volatile` is REQUIRED. Without it the optimiser sees that main() only ever
+   reads this variable and never writes it, concludes it cannot change, and
+   hoists the read out of the while(1) loop -- the loop then spins forever on
+   a stale value. It would still work at -Og and break at -O2. */
+volatile uint8_t received = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,7 +79,19 @@ static void MX_USART1_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+
+
+
 /* USER CODE END 0 */
+
+
+
+
+
+
+
+
+
 
 /**
   * @brief  The application entry point.
@@ -72,7 +101,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  start_time = HAL_GetTick();
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -98,27 +127,61 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  /* Arm the receiver for exactly 1 byte. This is a ONE-SHOT: once that byte
+     lands the HAL disarms itself, so the callback below has to re-arm it
+     every single time or you receive one byte and then silence forever.
+     Note `rx`, not `&rx` -- an array name already decays to a pointer. */
+  HAL_UART_Receive_IT(&huart1, rx, 1);
 
-  HAL_GPIO_WritePin(laser_GPIO_Port,laser_Pin,GPIO_PIN_SET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    
+
+
+
+
     /* USER CODE END WHILE */
-
-
-
     /* USER CODE BEGIN 3 */
+
+    if (received)
+    {
+      /* Clear the flag BEFORE acting. If a new byte arrives while we are
+         working, the ISR sets it again and we catch that byte next pass.
+         Clearing afterwards would wipe that notification. */
+      received = 0;
+
+      if (rx[0] == '1')
+      {
+        laser_on();
+      }
+      else if (rx[0] == '0')
+      {
+        laser_off();
+      }
+      /* anything else: ignore it */
+    }
+
+    /* No else, no delay, nothing that waits. The loop falls straight through
+       and runs again immediately, so the CPU is always free to respond. */
   }
-
-
-
-
-
   /* USER CODE END 3 */
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
   * @brief System Clock Configuration
@@ -347,6 +410,28 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+  * @brief  Called when the UART has received the number of bytes we asked for.
+  *
+  * The HAL declares this __weak with an empty body; defining a function with
+  * the identical signature here silently replaces it. There is nothing to
+  * register -- that is how every HAL callback works.
+  *
+  * Call chain: USART1 hardware IRQ -> USART1_IRQHandler() in stm32f4xx_it.c
+  *             -> HAL_UART_IRQHandler() -> this function.
+  *
+  * Keep it short. This runs in interrupt context, so no delays, no printf,
+  * no parsing. Capture what arrived, tell the main loop, get out.
+  */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1)
+  {
+    received = 1;                        /* tell the main loop */
+    HAL_UART_Receive_IT(&huart1, rx, 1); /* re-arm for the next byte */
+  }
+}
 
 /* USER CODE END 4 */
 

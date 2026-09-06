@@ -72,7 +72,7 @@ gdbserver:
 
 ## debug: attach gdb to an already-running `make gdbserver`
 debug: all
-	$(GDB_PREFIX)$(PREFIX)gdb $(BUILD_DIR)/$(TARGET).elf \
+	$(PREFIX)gdb $(BUILD_DIR)/$(TARGET).elf \
 	  -ex "target extended-remote localhost:$(GDB_PORT)" -ex "load" -ex "break main"
 
 ## size: per-section size breakdown of the ELF
