@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>   /* strcmp() for command matching */
 #include "laser.h"
 /* USER CODE END Includes */
 
@@ -57,12 +58,27 @@ static uint32_t start_time = 0;
    says a complete byte is sitting there. */
 uint8_t rx[1];
 
-/* Raised by the RX interrupt, cleared by the main loop.
-   `volatile` is REQUIRED. Without it the optimiser sees that main() only ever
-   reads this variable and never writes it, concludes it cannot change, and
-   hoists the read out of the while(1) loop -- the loop then spins forever on
-   a stale value. It would still work at -Og and break at -O2. */
-volatile uint8_t received = 0;
+/* Longest command we will accept, including the terminating '\0'.
+   Anything longer is discarded rather than allowed to run off the end of the
+   buffer -- an unterminated line is the classic way these parsers corrupt
+   memory. */
+#define CMD_MAX 64
+
+/* The line being assembled, byte by byte, by the RX interrupt. Once a
+   terminator arrives this holds a complete, NUL-terminated command string. */
+volatile char cmd_line[CMD_MAX];
+
+/* Write position within cmd_line. Only ever touched by the ISR. */
+static uint8_t cmd_idx = 0;
+
+/* Raised by the ISR when cmd_line holds a complete command; cleared by the
+   main loop once it has finished reading it. While this is set the ISR
+   DISCARDS incoming bytes -- that is what stops the interrupt overwriting a
+   line the main loop is still working on.
+   `volatile` is REQUIRED: without it the optimiser sees main() only reading
+   this and never writing it, decides it cannot change, and hoists the read
+   out of the while(1). Works at -Og, hangs at -O2. */
+volatile uint8_t cmd_ready = 0;
 
 /* USER CODE END PV */
 
@@ -147,22 +163,25 @@ int main(void)
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
 
-    if (received)
+    if (cmd_ready)
     {
-      /* Clear the flag BEFORE acting. If a new byte arrives while we are
-         working, the ISR sets it again and we catch that byte next pass.
-         Clearing afterwards would wipe that notification. */
-      received = 0;
+      /* NOTE the ordering change from the single-byte version: here we clear
+         the flag LAST, not first. The ISR drops incoming bytes for as long as
+         cmd_ready is set, so cmd_line is frozen while we work on it. Clearing
+         early would re-open the buffer to the ISR mid-comparison. */
 
-      if (rx[0] == '1')
+      if (strcmp((const char *)cmd_line, "LASER:ON") == 0)
       {
         laser_on();
       }
-      else if (rx[0] == '0')
+      else if (strcmp((const char *)cmd_line, "LASER:OFF") == 0)
       {
         laser_off();
       }
-      /* anything else: ignore it */
+      /* unknown command: ignored for now -- this is where ERR: replies and
+         the real KEY:VALUE parser will go */
+
+      cmd_ready = 0;   /* release the buffer back to the ISR */
     }
 
     /* No else, no delay, nothing that waits. The loop falls straight through
@@ -428,8 +447,38 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART1)
   {
-    received = 1;                        /* tell the main loop */
-    HAL_UART_Receive_IT(&huart1, rx, 1); /* re-arm for the next byte */
+    char c = (char)rx[0];
+
+    if (cmd_ready)
+    {
+      /* Main loop has not consumed the previous command yet. Drop this byte
+         rather than corrupt the buffer it is reading. */
+    }
+    else if (c == '\n' || c == '\r')
+    {
+      /* Terminator. Accept BOTH: `screen` sends \r on Enter, most Linux
+         tooling sends \n, and a Pi sending \r\n would otherwise deliver a
+         phantom empty command on the second character. */
+      if (cmd_idx > 0)
+      {
+        cmd_line[cmd_idx] = '\0';   /* make it a real C string */
+        cmd_ready = 1;              /* hand it to the main loop */
+        cmd_idx = 0;
+      }
+      /* cmd_idx == 0 means an empty line -- ignore it */
+    }
+    else if (cmd_idx < CMD_MAX - 1)
+    {
+      cmd_line[cmd_idx++] = c;      /* room left: keep the byte */
+    }
+    else
+    {
+      /* Overflow: no terminator arrived within CMD_MAX bytes. Throw the whole
+         line away instead of writing past the end of the buffer. */
+      cmd_idx = 0;
+    }
+
+    HAL_UART_Receive_IT(&huart1, rx, 1); /* re-arm -- still one-shot */
   }
 }
 
