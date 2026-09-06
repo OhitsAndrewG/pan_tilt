@@ -98,6 +98,8 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+
+  HAL_GPIO_WritePin(laser_GPIO_Port,laser_Pin,GPIO_PIN_SET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -105,7 +107,9 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    
+
+
+
     /* USER CODE BEGIN 3 */
   }
 
