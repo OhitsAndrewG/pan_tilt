@@ -24,6 +24,8 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>   /* strcmp() for command matching */
 #include "ultrasonic.h"
+#include "comms.h"
+#include <stdio.h>   /* snprintf for telemetry formatting */
 #include "laser.h"
 /* USER CODE END Includes */
 
@@ -151,7 +153,10 @@ int main(void)
   HAL_UART_Receive_IT(&huart1, rx, 1);
 
   /* Starts TIM4 counting and enables the ECHO capture interrupt. */
+  comms_init();
   ultrasonic_init();
+
+  comms_puts("BOOT:pan_tilt\r\n");
 
   /* USER CODE END 2 */
 
@@ -177,13 +182,19 @@ int main(void)
       if (strcmp((const char *)cmd_line, "LASER:ON") == 0)
       {
         laser_on();
+        comms_puts("OK\r\n");
       }
       else if (strcmp((const char *)cmd_line, "LASER:OFF") == 0)
       {
         laser_off();
+        comms_puts("OK\r\n");
       }
-      /* unknown command: ignored for now -- this is where ERR: replies and
-         the real KEY:VALUE parser will go */
+      else
+      {
+        /* Always answer something. A Pi waiting on a reply must never be
+           left guessing whether the command was lost or merely rejected. */
+        comms_puts("ERR:BADCMD\r\n");
+      }
 
       cmd_ready = 0;   /* release the buffer back to the ISR */
     }
@@ -191,6 +202,17 @@ int main(void)
     /* Paces the 10 Hz triggering and enforces the echo timeout. Returns
        immediately on every pass where there is nothing to do. */
     ultrasonic_task();
+
+    /* Publish each NEW range reading. take_reading() self-clears, so this
+       sends one line per measurement rather than spamming the same value
+       every pass through the loop. */
+    if (ultrasonic_take_reading())
+    {
+      char line[24];
+      snprintf(line, sizeof line, "RANGE:%u\r\n",
+               (unsigned)ultrasonic_get_cm());
+      comms_puts(line);
+    }
 
     /* No else, no delay, nothing that waits. The loop falls straight through
        and runs again immediately, so the CPU is always free to respond. */
