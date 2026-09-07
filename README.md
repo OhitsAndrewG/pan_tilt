@@ -58,3 +58,7 @@ It also re-scans `Core/Src`, so new files build with no config change.
 
 This is an eye hazard on a head that moves under software control. Point it at
 a wall, not a window.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
