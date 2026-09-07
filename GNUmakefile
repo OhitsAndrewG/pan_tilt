@@ -75,6 +75,18 @@ debug: all
 	$(PREFIX)gdb $(BUILD_DIR)/$(TARGET).elf \
 	  -ex "target extended-remote localhost:$(GDB_PORT)" -ex "load" -ex "break main"
 
+## range: print live HC-SR04 distance readings in cm (about 20 s)
+range: all
+	@CM=$$($(PREFIX)nm $(BUILD_DIR)/$(TARGET).elf | awk '/ last_cm$$/{print $$1}'); \
+	 printf 'g\n' > $(BUILD_DIR)/range.jlink; \
+	 i=0; while [ $$i -lt 60 ]; do \
+	   printf 'mem16 0x%s 1\nsleep 300\n' "$$CM" >> $(BUILD_DIR)/range.jlink; \
+	   i=$$((i+1)); done; \
+	 printf 'qc\n' >> $(BUILD_DIR)/range.jlink; \
+	 $(JLINK) $(JLINK_OPTS) -CommanderScript $(BUILD_DIR)/range.jlink 2>&1 \
+	   | grep -E '^[0-9A-F]{8} = [0-9A-F]{4}' \
+	   | while read -r addr eq val; do printf 'distance: %d cm\n' "0x$$val"; done
+
 ## size: per-section size breakdown of the ELF
 size: all
 	$(SZ) -A -x $(BUILD_DIR)/$(TARGET).elf
@@ -83,4 +95,4 @@ size: all
 help:
 	@grep -E '^## ' $(firstword $(MAKEFILE_LIST)) | sed 's/^## /  make /'
 
-.PHONY: sources flash erase reset gdbserver debug size help
+.PHONY: sources range flash erase reset gdbserver debug size help
