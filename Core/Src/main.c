@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>   /* strcmp() for command matching */
+#include "ultrasonic.h"
 #include "laser.h"
 /* USER CODE END Includes */
 
@@ -149,6 +150,9 @@ int main(void)
      Note `rx`, not `&rx` -- an array name already decays to a pointer. */
   HAL_UART_Receive_IT(&huart1, rx, 1);
 
+  /* Starts TIM4 counting and enables the ECHO capture interrupt. */
+  ultrasonic_init();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -183,6 +187,10 @@ int main(void)
 
       cmd_ready = 0;   /* release the buffer back to the ISR */
     }
+
+    /* Paces the 10 Hz triggering and enforces the echo timeout. Returns
+       immediately on every pass where there is nothing to do. */
+    ultrasonic_task();
 
     /* No else, no delay, nothing that waits. The loop falls straight through
        and runs again immediately, so the CPU is always free to respond. */
